@@ -105,7 +105,7 @@ function App() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
-  const [selectedResidential, setSelectedResidential] = useState("todos");
+  const [selectedResidential, setSelectedResidential] = useState("");
   const [selectedStatus, setSelectedStatus] = useState("disponivel");
   const [search, setSearch] = useState("");
   const [loginOpen, setLoginOpen] = useState(false);
@@ -150,6 +150,12 @@ function App() {
     () => [...new Set(apartments.map((apartment) => apartment.residential_number))].sort((a, b) => a - b),
     [apartments],
   );
+  const filterResidentialNumbers = residentialNumbers
+    .slice(-3)
+    .filter((number) => apartments.some((apartment) => apartment.residential_number === number && apartment.status !== "vendido"));
+  const selectedFilterResidential = filterResidentialNumbers.includes(Number(selectedResidential))
+    ? selectedResidential
+    : String(filterResidentialNumbers[0] ?? "");
   const recentResidentials = residentialNumbers.slice(-3).map((number) => ({ number, roman: romanNumeral(number) }));
 
   useEffect(() => {
@@ -204,7 +210,7 @@ function App() {
   }, [toast]);
 
   const filteredApartments = useMemo(() => apartments.filter((apartment) => {
-    const matchesResidential = selectedResidential === "todos" || apartment.residential_number === Number(selectedResidential);
+    const matchesResidential = selectedFilterResidential !== "" && apartment.residential_number === Number(selectedFilterResidential);
     const matchesStatus = selectedStatus === "todos" || apartment.status === selectedStatus;
     const term = search.trim().toLocaleLowerCase("pt-BR");
     const matchesSearch = !term
@@ -213,7 +219,7 @@ function App() {
       || String(unitDisplayNumber(apartments, apartment)).includes(term)
       || String(apartment.apartment_number).includes(term);
     return matchesResidential && matchesStatus && matchesSearch;
-  }), [apartments, search, selectedResidential, selectedStatus]);
+  }), [apartments, search, selectedFilterResidential, selectedStatus]);
 
   const visibleApartments = filteredApartments;
   const availableCount = apartments.filter((apartment) => apartment.status === "disponivel").length;
@@ -414,9 +420,10 @@ function App() {
           <div className="filter-bar">
             <label className="select-wrap residential-select">
               <Building2 size={17} />
-              <select aria-label="Filtrar por residencial" value={selectedResidential} onChange={(event) => setSelectedResidential(event.target.value)}>
-                <option value="todos">Todos os residenciais</option>
-                {residentialNumbers.map((number) => <option value={number} key={number}>Residencial Plenitude {romanNumeral(number)}</option>)}
+              <select aria-label="Filtrar por residencial" value={selectedFilterResidential} onChange={(event) => setSelectedResidential(event.target.value)}>
+                {filterResidentialNumbers.length === 0
+                  ? <option value="">Nenhum residencial disponível</option>
+                  : filterResidentialNumbers.map((number) => <option value={number} key={number}>Residencial Plenitude {romanNumeral(number)}</option>)}
               </select>
               <ChevronDown size={15} />
             </label>
@@ -444,7 +451,7 @@ function App() {
           {loadError && isSupabaseConfigured && <div className="setup-notice error-notice"><ShieldCheck size={18} /><span>{loadError} Confira a configuração e as tabelas no Supabase.</span></div>}
 
           <div className="results-caption">
-            <span>{selectedResidential === "todos" ? "TODOS OS RESIDENCIAIS" : `RESIDENCIAL PLENITUDE ${romanNumeral(Number(selectedResidential))}`}</span>
+            <span>{selectedFilterResidential === "" ? "NENHUM RESIDENCIAL DISPONÍVEL" : `RESIDENCIAL PLENITUDE ${romanNumeral(Number(selectedFilterResidential))}`}</span>
             <span>{negotiationCount > 0 && selectedStatus === "todos" ? `${negotiationCount} em negociação` : `${residentialCount} empreendimentos`}</span>
           </div>
 
