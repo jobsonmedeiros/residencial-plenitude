@@ -168,7 +168,7 @@ button { cursor: pointer; }
 .admin-dialog-heading .dialog-icon { margin: 0; flex-shrink: 0; }
 .admin-dialog-heading>div { flex: 1; }
 .admin-dialog-heading h2 { margin-bottom: 0; }
-.admin-mode-toggle { flex-shrink: 0; white-space: nowrap; }
+.admin-mode-toggle { flex-shrink: 0; margin-right: 36px; white-space: nowrap; }
 .admin-dialog>p { margin: 14px 0 17px; }
 .admin-dialog form { display: flex; flex-direction: column; gap: 4px; }
 .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 13px; }
@@ -270,7 +270,7 @@ button { cursor: pointer; }
   .admin-dialog { padding: 25px 19px 20px; }
   .admin-dialog-heading { gap: 8px; }
   .admin-dialog-heading h2 { font-size: 18px; }
-  .admin-mode-toggle { padding: 0 8px; font-size: 9px; }
+  .admin-mode-toggle { margin-right: 30px; padding: 0 8px; font-size: 9px; }
   .form-row { gap: 8px; }
   .floor-count-row { grid-template-columns: minmax(0,1fr) auto 36px; gap: 7px; }
   .form-row label { font-size: 9px; }
