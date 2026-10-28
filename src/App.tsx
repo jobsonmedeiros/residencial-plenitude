@@ -164,28 +164,35 @@ function App() {
       }
       setSession(data.session);
     });
-    const { data: authListener } = client.auth.onAuthStateChange((_event, nextSession) => {
+    const { data: authListener } = client.auth.onAuthStateChange((event, nextSession) => {
       setSession(nextSession);
-      setIsAdmin(false);
-      setAdminOpen(false);
-      setLoginOpen(false);
-      if (nextSession) {
-        void client
-          .from("profiles")
-          .select("role")
-          .eq("user_id", nextSession.user.id)
-          .maybeSingle()
-          .then(({ data, error }) => {
-            if (error) {
-              setToast(`Não foi possível verificar o perfil: ${error.message}`);
-              return;
-            }
-            const hasAdminAccess = data?.role === "admin";
-            setIsAdmin(hasAdminAccess);
-            if (hasAdminAccess) setAdminOpen(true);
-            else setToast("Seu usuário não tem permissão de administrador.");
-          });
+      if (!nextSession) {
+        setIsAdmin(false);
+        setAdminOpen(false);
+        setLoginOpen(false);
+        return;
       }
+
+      if (event === "SIGNED_IN") {
+        setAdminOpen(false);
+        setLoginOpen(false);
+      }
+
+      void client
+        .from("profiles")
+        .select("role")
+        .eq("user_id", nextSession.user.id)
+        .maybeSingle()
+        .then(({ data, error }) => {
+          if (error) {
+            setToast(`Não foi possível verificar o perfil: ${error.message}`);
+            return;
+          }
+          const hasAdminAccess = data?.role === "admin";
+          setIsAdmin(hasAdminAccess);
+          if (event === "SIGNED_IN" && hasAdminAccess) setAdminOpen(true);
+          if (event === "SIGNED_IN" && !hasAdminAccess) setToast("Seu usuário não tem permissão de administrador.");
+        });
     });
     return () => authListener.subscription.unsubscribe();
   }, [fetchApartments]);
@@ -355,14 +362,13 @@ function App() {
         </nav>
         <div className="header-account">
           {session && isAdmin
-            ? <button className="admin-access" onClick={() => {
-              if (!isAdmin) {
-                setToast("Seu usuário não tem permissão de administrador.");
-                return;
-              }
-              prepareEdit(editResidential, editApartment);
-              setAdminOpen(true);
-            }}><Pencil size={15} /> Login</button>
+            ? <>
+              <button className="admin-access" onClick={() => {
+                prepareEdit(editResidential, editApartment);
+                setAdminOpen(true);
+              }}><Pencil size={15} /> Gerenciar imóveis</button>
+              <button className="login-link" onClick={() => void handleLogout()}><LogIn size={15} className="logout-icon" /> Sair</button>
+            </>
             : session
               ? <button className="login-link" onClick={() => void handleLogout()}><LogIn size={15} className="logout-icon" /> Sair</button>
               : <button className="login-link" onClick={() => setLoginOpen(true)}><LockKeyhole size={15} /> Login</button>}
