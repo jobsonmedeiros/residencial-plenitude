@@ -180,7 +180,10 @@ function App() {
               setToast(`Não foi possível verificar o perfil: ${error.message}`);
               return;
             }
-            setIsAdmin(data?.role === "admin");
+            const hasAdminAccess = data?.role === "admin";
+            setIsAdmin(hasAdminAccess);
+            if (hasAdminAccess) setAdminOpen(true);
+            else setToast("Seu usuário não tem permissão de administrador.");
           });
       }
     });
