@@ -750,7 +750,7 @@ function App() {
                         <div className="card-attribute-group">
                           <strong>Características</strong>
                           {technicalAttributes.map((attribute, index) => (
-                            <p key={`${attribute.label}-${index}`}><span>{attribute.label}</span>{attribute.value}</p>
+                            <p key={`${attribute.label}-${index}`}><span>{attribute.label}</span><strong>{attribute.value}</strong></p>
                           ))}
                           {apartment.technical_extra.trim() && <p>{apartment.technical_extra}</p>}
                         </div>
@@ -759,7 +759,7 @@ function App() {
                         <div className="card-attribute-group">
                           <strong>Informações de venda</strong>
                           {financialAttributes.map((attribute, index) => (
-                            <p key={`${attribute.label}-${index}`}><span>{attribute.label}</span>{attribute.value}</p>
+                            <p key={`${attribute.label}-${index}`}><span>{attribute.label}</span><strong>{attribute.value}</strong></p>
                           ))}
                           {apartment.financial_extra.trim() && <p>{apartment.financial_extra}</p>}
                         </div>
