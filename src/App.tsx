@@ -225,7 +225,7 @@ function App() {
     if (homeGalleryHovered || homeGalleryFocused || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
     const timer = window.setInterval(
       () => setHomeGalleryIndex((index) => (index + 1) % homeGallerySlides.length),
-      5000,
+      3000,
     );
     return () => window.clearInterval(timer);
   }, [homeGalleryFocused, homeGalleryHovered]);
