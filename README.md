@@ -44,7 +44,7 @@ O projeto foi desenvolvido para aproximar clientes e consultores: além de explo
    npm install
    ```
 
-2. No SQL Editor do Supabase, execute [`supabase/setup.sql`](supabase/setup.sql). O script cria as tabelas e políticas de acesso; os residenciais devem ser cadastrados pelo painel administrativo.
+2. No SQL Editor do Supabase, execute [`supabase/setup.sql`](supabase/setup.sql). O script cria as tabelas e políticas de acesso, mas não insere residenciais nem apartamentos. O cadastro é feito pelo painel administrativo.
 3. Crie o usuário administrador em **Authentication → Users → Add user**.
 4. Execute o comando comentado ao final de `supabase/setup.sql`, substituindo o e-mail pelo do administrador. Somente usuários com perfil `admin` podem editar apartamentos.
 5. Copie `.env.example` para `.env.local` e informe a URL do projeto e a chave pública (anon/publishable), disponíveis em **Project Settings → API**:
@@ -64,7 +64,7 @@ O catálogo permite leitura pública; alterações exigem login e são protegida
 
 ## Atualizar um projeto Supabase existente
 
-Se o banco já foi configurado anteriormente, execute no SQL Editor apenas as migrações necessárias para as funcionalidades desejadas:
+Se o banco já foi configurado anteriormente, execute no SQL Editor as migrações necessárias. Para habilitar nomes personalizados e impedir nomes repetidos, execute `supabase/add-residential-name.sql` se a coluna ainda não existir e, em seguida, `supabase/add-unique-residential-name.sql`. A migração de unicidade também adiciona a coluna caso necessário. Se encontrar residenciais sem nome, nomes duplicados ou unidades do mesmo residencial com nomes divergentes, ela interrompe a execução sem excluir registros; corrija os dados existentes manualmente e execute-a novamente.
 
 | Arquivo | Finalidade |
 | --- | --- |
@@ -72,11 +72,11 @@ Se o banco já foi configurado anteriormente, execute no SQL Editor apenas as mi
 | [`supabase/add-apartment-details.sql`](supabase/add-apartment-details.sql) | Adiciona campos técnicos e financeiros aos apartamentos. |
 | [`supabase/add-apartment-price-optional.sql`](supabase/add-apartment-price-optional.sql) | Permite preço não definido; o anúncio exibe “A consultar”. |
 | [`supabase/add-residential-name.sql`](supabase/add-residential-name.sql) | Permite nomes personalizados para novos residenciais. |
-| [`supabase/add-unique-residential-name.sql`](supabase/add-unique-residential-name.sql) | Impede nomes repetidos, ignorando maiúsculas/minúsculas e espaços nas extremidades. |
+| [`supabase/add-unique-residential-name.sql`](supabase/add-unique-residential-name.sql) | Exige nome em novos cadastros e bloqueia nomes repetidos, ignorando maiúsculas/minúsculas e espaços excedentes. Detecta conflitos existentes sem apagá-los. |
 | [`supabase/add-apartment-deletion.sql`](supabase/add-apartment-deletion.sql) | Habilita a exclusão de apartamentos e residenciais. A exclusão de um residencial também remove suas unidades. |
 | [`supabase/remove-seed-residentials.sql`](supabase/remove-seed-residentials.sql) | Remove dados antigos de exemplo. **Apaga permanentemente apartamentos e residenciais**; faça backup antes de executar. |
 
-Após configurar a gestão de residenciais, entre no site como administrador e selecione **Novo residencial**. Informe o nome e a quantidade de apartamentos por andar; o painel numera as unidades automaticamente.
+Após configurar a gestão de residenciais, entre no site como administrador e selecione **Novo residencial**. Informe explicitamente o nome e a quantidade de apartamentos por andar. A criação é permitida apenas a administradores; o banco rejeita nomes vazios e nomes já utilizados em outro residencial.
 
 ## Publicação
 

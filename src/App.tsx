@@ -29,6 +29,7 @@ type ApartmentStatus = "confirmar" | "disponivel" | "negociacao" | "vendido";
 type Apartment = {
   id: number;
   residential_number: number;
+  residential_name: string | null;
   apartment_number: number;
   floor: string;
   status: ApartmentStatus;
@@ -77,6 +78,15 @@ function floorLabel(index: number) {
   return index === 0 ? "Térreo" : `${index}º andar`;
 }
 
+function residentialDisplayName(apartments: Apartment[], residentialNumber: number) {
+  const customName = apartments.find((apartment) => apartment.residential_number === residentialNumber)?.residential_name?.trim();
+  return customName || `Residencial Plenitude ${romanNumeral(residentialNumber)}`;
+}
+
+function normalizeResidentialName(name: string) {
+  return name.trim().replace(/\s+/g, " ").toLocaleLowerCase("pt-BR");
+}
+
 function unitDisplayNumber(apartments: Apartment[], apartment: Apartment) {
   const floorPosition = apartments
     .filter((item) => item.residential_number === apartment.residential_number && item.floor === apartment.floor)
@@ -118,6 +128,7 @@ function App() {
   const [editResidential, setEditResidential] = useState("13");
   const [editApartment, setEditApartment] = useState("1");
   const [creatingResidential, setCreatingResidential] = useState(false);
+  const [newResidentialName, setNewResidentialName] = useState("");
   const [floorCounts, setFloorCounts] = useState([{ count: "3" }, { count: "3" }]);
   const [editStatus, setEditStatus] = useState<ApartmentStatus>("disponivel");
   const [editPrice, setEditPrice] = useState("");
@@ -135,7 +146,7 @@ function App() {
     setLoadError("");
     const { data, error } = await supabase
       .from("apartments")
-      .select("id,residential_number,apartment_number,floor,status,price,area,bedrooms,description,updated_at")
+      .select("id,residential_number,residential_name,apartment_number,floor,status,price,area,bedrooms,description,updated_at")
       .order("residential_number")
       .order("apartment_number");
     if (error) {
@@ -214,7 +225,7 @@ function App() {
     const matchesStatus = selectedStatus === "todos" || apartment.status === selectedStatus;
     const term = search.trim().toLocaleLowerCase("pt-BR");
     const matchesSearch = !term
-      || `residencial plenitude ${romanNumeral(apartment.residential_number)}`.toLocaleLowerCase("pt-BR").includes(term)
+      || residentialDisplayName(apartments, apartment.residential_number).toLocaleLowerCase("pt-BR").includes(term)
       || `apartamento ${unitDisplayNumber(apartments, apartment)}`.includes(term)
       || String(unitDisplayNumber(apartments, apartment)).includes(term)
       || String(apartment.apartment_number).includes(term);
@@ -318,9 +329,25 @@ function App() {
       return;
     }
 
+    const residentialName = newResidentialName.trim();
+    if (!residentialName) {
+      setToast("Informe o nome do residencial.");
+      return;
+    }
+
+    const normalizedResidentialName = normalizeResidentialName(residentialName);
+    const duplicateResidential = apartments.find(
+      (apartment) => normalizeResidentialName(residentialDisplayName(apartments, apartment.residential_number)) === normalizedResidentialName,
+    );
+    if (duplicateResidential) {
+      setToast(`Já existe um residencial chamado "${residentialDisplayName(apartments, duplicateResidential.residential_number)}". Informe outro nome.`);
+      return;
+    }
+
     const newApartments = floorCounts.flatMap(({ count }, floorIndex) =>
       Array.from({ length: Number(count) }, (_, position) => ({
         residential_number: residentialNumber,
+        residential_name: residentialName,
         apartment_number: floorCounts
           .slice(0, floorIndex)
           .reduce((total, floor) => total + Number(floor.count), 0) + position + 1,
@@ -336,8 +363,9 @@ function App() {
       return;
     }
 
-    setToast(`Residencial ${romanNumeral(residentialNumber)} criado com ${apartmentCount} apartamentos.`);
+    setToast(`${residentialName} criado com ${apartmentCount} apartamentos.`);
     setCreatingResidential(false);
+    setNewResidentialName("");
     setFloorCounts([{ count: "3" }, { count: "3" }]);
     setEditResidential(String(residentialNumber));
     setEditApartment("1");
@@ -423,7 +451,7 @@ function App() {
               <select aria-label="Filtrar por residencial" value={selectedFilterResidential} onChange={(event) => setSelectedResidential(event.target.value)}>
                 {filterResidentialNumbers.length === 0
                   ? <option value="">Nenhum residencial disponível</option>
-                  : filterResidentialNumbers.map((number) => <option value={number} key={number}>Residencial Plenitude {romanNumeral(number)}</option>)}
+                  : filterResidentialNumbers.map((number) => <option value={number} key={number}>{residentialDisplayName(apartments, number)}</option>)}
               </select>
               <ChevronDown size={15} />
             </label>
@@ -451,7 +479,7 @@ function App() {
           {loadError && isSupabaseConfigured && <div className="setup-notice error-notice"><ShieldCheck size={18} /><span>{loadError} Confira a configuração e as tabelas no Supabase.</span></div>}
 
           <div className="results-caption">
-            <span>{selectedFilterResidential === "" ? "NENHUM RESIDENCIAL DISPONÍVEL" : `RESIDENCIAL PLENITUDE ${romanNumeral(Number(selectedFilterResidential))}`}</span>
+            <span>{selectedFilterResidential === "" ? "NENHUM RESIDENCIAL DISPONÍVEL" : residentialDisplayName(apartments, Number(selectedFilterResidential)).toLocaleUpperCase("pt-BR")}</span>
             <span>{negotiationCount > 0 && selectedStatus === "todos" ? `${negotiationCount} em negociação` : `${residentialCount} empreendimentos`}</span>
           </div>
 
@@ -476,7 +504,7 @@ function App() {
                       <span className={`status-pill ${statuses[apartment.status].className}`}><i />{statuses[apartment.status].label}</span>
                     </div>
                     <div className="card-content">
-                      <div className="card-residential">RESIDENCIAL PLENITUDE {romanNumeral(apartment.residential_number)}</div>
+                      <div className="card-residential">{residentialDisplayName(apartments, apartment.residential_number).toLocaleUpperCase("pt-BR")}</div>
                       <h3>Apartamento {unitDisplayNumber(apartments, apartment)}</h3>
                       <div className="apartment-details">
                         <span><DoorOpen size={15} /> {apartment.floor}</span>
@@ -487,7 +515,7 @@ function App() {
                       <div className="card-footer">
                         <div><small>VALOR</small><strong>{apartment.price ? currency(apartment.price) : "Consulte"}</strong></div>
                         {apartment.status === "disponivel"
-                          ? <a href={`https://wa.me/${consultantWhatsappNumber}?text=${encodeURIComponent(`Olá! Vim do site e tenho interesse no Apartamento ${unitDisplayNumber(apartments, apartment)} do Residencial Plenitude ${romanNumeral(apartment.residential_number)}.`)}`} target="_blank" rel="noreferrer" className="card-action" aria-label="Consultar apartamento"><ArrowRight size={18} /></a>
+                          ? <a href={`https://wa.me/${consultantWhatsappNumber}?text=${encodeURIComponent(`Olá! Vim do site e tenho interesse no Apartamento ${unitDisplayNumber(apartments, apartment)} do ${residentialDisplayName(apartments, apartment.residential_number)}.`)}`} target="_blank" rel="noreferrer" className="card-action" aria-label="Consultar apartamento"><ArrowRight size={18} /></a>
                           : <span className="card-status-note">{statuses[apartment.status].label}</span>}
                       </div>
                     </div>
@@ -540,15 +568,18 @@ function App() {
             <button className="dialog-close icon-button" onClick={() => setAdminOpen(false)} aria-label="Fechar"><X size={20} /></button>
             <div className="admin-dialog-heading">
               <span className="dialog-icon"><Pencil size={20} /></span>
-              <div><span className="section-kicker">GERENCIAR IMÓVEIS</span><h2 id="admin-title">{creatingResidential ? `Residencial ${romanNumeral((residentialNumbers[residentialNumbers.length - 1] ?? 0) + 1)}` : "Painel administrativo"}</h2></div>
+              <div><span className="section-kicker">GERENCIAR IMÓVEIS</span><h2 id="admin-title">{creatingResidential ? newResidentialName.trim() || "Novo residencial" : "Painel administrativo"}</h2></div>
               <button type="button" className="secondary-button admin-mode-toggle" onClick={() => setCreatingResidential(!creatingResidential)}>
                 {creatingResidential ? <><Pencil size={15} /> Editar unidades</> : <><Plus size={15} /> Novo residencial</>}
               </button>
             </div>
             {creatingResidential ? (
               <>
-                <p>Informe quantos apartamentos serão criados em cada andar. A numeração será gerada automaticamente.</p>
+                <p>Informe o nome do residencial e quantos apartamentos serão criados em cada andar.</p>
                 <form onSubmit={handleCreateResidential}>
+                  <label>Nome do residencial
+                    <input type="text" maxLength={100} value={newResidentialName} onChange={(event) => setNewResidentialName(event.target.value)} placeholder="Informe o nome do residencial" required />
+                  </label>
                   <div className="floor-count-list">
                     {floorCounts.map((floor, index) => (
                       <div className="floor-count-row" key={index}>
@@ -574,7 +605,7 @@ function App() {
                   <div className="form-row">
                     <label>Residencial
                       <select value={editResidential} onChange={(event) => prepareEdit(event.target.value, editApartment)} onWheel={(event) => changeSelectWithWheel(event, (value) => prepareEdit(value, editApartment))}>
-                        {recentResidentials.map(({ number, roman }) => <option value={number} key={roman}>Residencial Plenitude {roman}</option>)}
+                        {recentResidentials.map(({ number, roman }) => <option value={number} key={roman}>{residentialDisplayName(apartments, number)}</option>)}
                       </select>
                     </label>
                     <label>Apartamento
@@ -583,7 +614,7 @@ function App() {
                       </select>
                     </label>
                   </div>
-                  {selectedRecord && <div className="current-apartment"><Building2 size={17} /><span><strong>Residencial {romanNumeral(selectedRecord.residential_number)} · Apartamento {unitDisplayNumber(apartments, selectedRecord)}</strong><small>{selectedRecord.floor}</small></span><span className={`status-pill ${statuses[selectedRecord.status].className}`}><i />{statuses[selectedRecord.status].label}</span></div>}
+                  {selectedRecord && <div className="current-apartment"><Building2 size={17} /><span><strong>{residentialDisplayName(apartments, selectedRecord.residential_number)} · Apartamento {unitDisplayNumber(apartments, selectedRecord)}</strong><small>{selectedRecord.floor}</small></span><span className={`status-pill ${statuses[selectedRecord.status].className}`}><i />{statuses[selectedRecord.status].label}</span></div>}
                   <div className="form-row">
                     <label>Situação
                       <select value={editStatus} onChange={(event) => setEditStatus(event.target.value as ApartmentStatus)} onWheel={(event) => changeSelectWithWheel(event, (value) => setEditStatus(value as ApartmentStatus))}>
