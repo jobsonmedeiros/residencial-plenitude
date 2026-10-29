@@ -39,7 +39,7 @@ type Apartment = {
   updated_at: string;
 };
 
-const whatsappNumber = "5583996548074";
+const consultantWhatsappNumber = "5500000000000";
 const developerWhatsappNumber = "5583996013656";
 const statuses: Record<ApartmentStatus, { label: string; className: string }> = {
   confirmar: { label: "A confirmar", className: "pending" },
@@ -364,7 +364,7 @@ function App() {
         <nav className={`main-nav ${mobileMenuOpen ? "nav-open" : ""}`}>
           <a href="#imoveis" onClick={() => setMobileMenuOpen(false)}>Nossos imóveis</a>
           <a href="#sobre" onClick={() => setMobileMenuOpen(false)}>Sobre o Plenitude</a>
-          <a className="nav-contact" href={`https://wa.me/${whatsappNumber}?text=${encodeURIComponent("Olá! Vim do site e quero saber mais sobre os apartamentos Plenitude.")}`} target="_blank" rel="noreferrer">Fale com um consultor <ArrowRight size={15} /></a>
+          <a className="nav-contact" href={`https://wa.me/${consultantWhatsappNumber}?text=${encodeURIComponent("Olá! Vim do site e quero saber mais sobre os apartamentos Plenitude.")}`} target="_blank" rel="noreferrer">Fale com um consultor <ArrowRight size={15} /></a>
         </nav>
         <div className="header-account">
           {session && isAdmin
@@ -487,7 +487,7 @@ function App() {
                       <div className="card-footer">
                         <div><small>VALOR</small><strong>{apartment.price ? currency(apartment.price) : "Consulte"}</strong></div>
                         {apartment.status === "disponivel"
-                          ? <a href={`https://wa.me/${whatsappNumber}?text=${encodeURIComponent(`Olá! Vim do site e tenho interesse no Apartamento ${unitDisplayNumber(apartments, apartment)} do Residencial Plenitude ${romanNumeral(apartment.residential_number)}.`)}`} target="_blank" rel="noreferrer" className="card-action" aria-label="Consultar apartamento"><ArrowRight size={18} /></a>
+                          ? <a href={`https://wa.me/${consultantWhatsappNumber}?text=${encodeURIComponent(`Olá! Vim do site e tenho interesse no Apartamento ${unitDisplayNumber(apartments, apartment)} do Residencial Plenitude ${romanNumeral(apartment.residential_number)}.`)}`} target="_blank" rel="noreferrer" className="card-action" aria-label="Consultar apartamento"><ArrowRight size={18} /></a>
                           : <span className="card-status-note">{statuses[apartment.status].label}</span>}
                       </div>
                     </div>
@@ -502,7 +502,7 @@ function App() {
         <section className="contact-banner">
           <div className="contact-icon"><KeyRound size={23} /></div>
           <div><span className="section-kicker">A GENTE TE AJUDA</span><h2>Encontrou seu lugar?</h2><p>Nosso time está pronto para conversar com você.</p></div>
-          <a href={`https://wa.me/${whatsappNumber}?text=${encodeURIComponent("Olá! Vim do site e quero conhecer os apartamentos Plenitude.")}`} target="_blank" rel="noreferrer">Fale com um consultor <ArrowRight size={16} /></a>
+          <a href={`https://wa.me/${consultantWhatsappNumber}?text=${encodeURIComponent("Olá! Vim do site e quero conhecer os apartamentos Plenitude.")}`} target="_blank" rel="noreferrer">Fale com um consultor <ArrowRight size={16} /></a>
         </section>
       </main>
 
