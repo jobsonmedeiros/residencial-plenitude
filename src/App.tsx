@@ -7,6 +7,8 @@ import {
   Building2,
   Check,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   CircleCheck,
   DoorOpen,
   House,
@@ -26,6 +28,7 @@ import {
 import { isSupabaseConfigured, supabase } from "./lib/supabase";
 
 type ApartmentStatus = "confirmar" | "disponivel" | "negociacao" | "vendido";
+type ApartmentAttribute = { label: string; value: string };
 type Apartment = {
   id: number;
   residential_number: number;
@@ -33,15 +36,52 @@ type Apartment = {
   apartment_number: number;
   floor: string;
   status: ApartmentStatus;
-  price: number;
+  price: number | null;
   area: number | null;
-  bedrooms: number;
+  bedrooms: number | null;
   description: string;
+  technical_attributes: ApartmentAttribute[];
+  technical_extra: string;
+  financial_attributes: ApartmentAttribute[];
+  financial_extra: string;
   updated_at: string;
 };
 
 const consultantWhatsappNumber = "5500000000000";
 const developerWhatsappNumber = "5583996013656";
+const homeCarouselImage = (fileName: string) => `${import.meta.env.BASE_URL}images/home-carousel/${fileName}`;
+const homeGallerySlides = [
+  { title: "Sala e jantar integradas", image: homeCarouselImage("apartamento-gomes-carvalho-02.webp") },
+  { title: "Espaço de jantar", image: homeCarouselImage("apartamento-gomes-carvalho-03.webp") },
+  { title: "Cozinha integrada", image: homeCarouselImage("apartamento-gomes-carvalho-04.webp") },
+  { title: "Sala de estar", image: homeCarouselImage("apartamento-gomes-carvalho-05.webp") },
+  { title: "Integração entre ambientes", image: homeCarouselImage("apartamento-gomes-carvalho-06.webp") },
+  { title: "Sala compacta", image: homeCarouselImage("apartamento_pequeno48m2_2.jpg") },
+  { title: "Armários e circulação", image: homeCarouselImage("apartamento_pequeno48m2_3.jpg") },
+  { title: "Cozinha integrada", image: homeCarouselImage("apartamento_pequeno48m2_5.jpg") },
+  { title: "Circulação e aproveitamento", image: homeCarouselImage("apartamento_pequeno48m2_6.jpg") },
+  { title: "Sala e cozinha", image: homeCarouselImage("apartamento_pequeno48m2_7.jpg") },
+  { title: "Hall e armazenamento", image: homeCarouselImage("apartamento_pequeno48m2_11.jpg") },
+  { title: "Ambientes planejados", image: homeCarouselImage("apartamento_pequeno48m2_12.jpg") },
+];
+const defaultTechnicalAttributes: ApartmentAttribute[] = [
+  { label: "Endereço completo com CEP", value: "" },
+  { label: "Área total (m²)", value: "" },
+  { label: "Suítes", value: "" },
+  { label: "Banheiros e lavabos", value: "" },
+  { label: "Vagas de garagem", value: "" },
+  { label: "Posição solar", value: "" },
+  { label: "Acabamentos", value: "" },
+  { label: "Lazer do condomínio", value: "" },
+  { label: "Segurança", value: "" },
+];
+const defaultFinancialAttributes: ApartmentAttribute[] = [
+  { label: "Condomínio mensal", value: "" },
+  { label: "IPTU (parcela)", value: "" },
+  { label: "Escritura e registro (RGI)", value: "" },
+  { label: "Aceita financiamento bancário", value: "" },
+  { label: "Aceita FGTS", value: "" },
+];
 const statuses: Record<ApartmentStatus, { label: string; className: string }> = {
   confirmar: { label: "A confirmar", className: "pending" },
   disponivel: { label: "Disponível", className: "available" },
@@ -121,6 +161,9 @@ function App() {
   const [loginOpen, setLoginOpen] = useState(false);
   const [adminOpen, setAdminOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [homeGalleryIndex, setHomeGalleryIndex] = useState(0);
+  const [homeGalleryHovered, setHomeGalleryHovered] = useState(false);
+  const [homeGalleryFocused, setHomeGalleryFocused] = useState(false);
   const [toast, setToast] = useState("");
   const [busy, setBusy] = useState(false);
   const [loginEmail, setLoginEmail] = useState("");
@@ -133,28 +176,36 @@ function App() {
   const [editStatus, setEditStatus] = useState<ApartmentStatus>("disponivel");
   const [editPrice, setEditPrice] = useState("");
   const [editArea, setEditArea] = useState("");
-  const [editBedrooms, setEditBedrooms] = useState("2");
+  const [editBedrooms, setEditBedrooms] = useState("");
   const [editDescription, setEditDescription] = useState("");
+  const [editTechnicalAttributes, setEditTechnicalAttributes] = useState<ApartmentAttribute[]>(defaultTechnicalAttributes);
+  const [editTechnicalExtra, setEditTechnicalExtra] = useState("");
+  const [editFinancialAttributes, setEditFinancialAttributes] = useState<ApartmentAttribute[]>(defaultFinancialAttributes);
+  const [editFinancialExtra, setEditFinancialExtra] = useState("");
 
-  const fetchApartments = useCallback(async () => {
+  const fetchApartments = useCallback(async (): Promise<Apartment[] | null> => {
     if (!supabase) {
       setLoading(false);
       setLoadError("Configure o Supabase para carregar a disponibilidade atualizada dos imóveis.");
-      return;
+      return null;
     }
 
     setLoadError("");
     const { data, error } = await supabase
       .from("apartments")
-      .select("id,residential_number,residential_name,apartment_number,floor,status,price,area,bedrooms,description,updated_at")
+      .select("id,residential_number,residential_name,apartment_number,floor,status,price,area,bedrooms,description,technical_attributes,technical_extra,financial_attributes,financial_extra,updated_at")
       .order("residential_number")
       .order("apartment_number");
     if (error) {
       setLoadError(`Não foi possível carregar os apartamentos: ${error.message}`);
+      setLoading(false);
+      return null;
     } else {
-      setApartments((data ?? []) as Apartment[]);
+      const loadedApartments = (data ?? []) as Apartment[];
+      setApartments(loadedApartments);
+      setLoading(false);
+      return loadedApartments;
     }
-    setLoading(false);
   }, []);
 
   const residentialNumbers = useMemo(
@@ -168,6 +219,16 @@ function App() {
     ? selectedResidential
     : String(filterResidentialNumbers[0] ?? "");
   const recentResidentials = residentialNumbers.slice(-3).map((number) => ({ number, roman: romanNumeral(number) }));
+  const activeHomeGallerySlide = homeGallerySlides[homeGalleryIndex];
+
+  useEffect(() => {
+    if (homeGalleryHovered || homeGalleryFocused || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const timer = window.setInterval(
+      () => setHomeGalleryIndex((index) => (index + 1) % homeGallerySlides.length),
+      5000,
+    );
+    return () => window.clearInterval(timer);
+  }, [homeGalleryFocused, homeGalleryHovered]);
 
   useEffect(() => {
     void fetchApartments();
@@ -225,6 +286,7 @@ function App() {
     const matchesStatus = selectedStatus === "todos" || apartment.status === selectedStatus;
     const term = search.trim().toLocaleLowerCase("pt-BR");
     const matchesSearch = !term
+      || `residencial plenitude ${romanNumeral(apartment.residential_number)}`.toLocaleLowerCase("pt-BR").includes(term)
       || residentialDisplayName(apartments, apartment.residential_number).toLocaleLowerCase("pt-BR").includes(term)
       || `apartamento ${unitDisplayNumber(apartments, apartment)}`.includes(term)
       || String(unitDisplayNumber(apartments, apartment)).includes(term)
@@ -239,23 +301,51 @@ function App() {
   const totalResidentialCount = Math.max(13, residentialNumbers.length);
   const totalApartmentCount = Math.max(78, apartments.length);
 
-  function prepareEdit(residential: string, apartment: string) {
-    setEditResidential(residential);
-    setEditApartment(apartment);
-    const record = apartments.find((item) => item.residential_number === Number(residential) && item.apartment_number === Number(apartment));
+  function populateEdit(record: Apartment | undefined) {
     if (!record) {
       setEditStatus("confirmar");
       setEditPrice("");
       setEditArea("");
-      setEditBedrooms("2");
+      setEditBedrooms("");
       setEditDescription("");
+      setEditTechnicalAttributes(defaultTechnicalAttributes.map((attribute) => ({ ...attribute })));
+      setEditTechnicalExtra("");
+      setEditFinancialAttributes(defaultFinancialAttributes.map((attribute) => ({ ...attribute })));
+      setEditFinancialExtra("");
       return;
     }
     setEditStatus(record.status);
     setEditPrice(record.price ? String(record.price) : "");
     setEditArea(record.area ? String(record.area) : "");
-    setEditBedrooms(String(record.bedrooms));
+    setEditBedrooms(record.bedrooms == null ? "" : String(record.bedrooms));
     setEditDescription(record.description);
+    setEditTechnicalAttributes(record.technical_attributes?.length
+      ? record.technical_attributes.map((attribute) => ({ ...attribute }))
+      : defaultTechnicalAttributes.map((attribute) => ({ ...attribute })));
+    setEditTechnicalExtra(record.technical_extra ?? "");
+    setEditFinancialAttributes(record.financial_attributes?.length
+      ? record.financial_attributes.map((attribute) => ({ ...attribute }))
+      : defaultFinancialAttributes.map((attribute) => ({ ...attribute })));
+    setEditFinancialExtra(record.financial_extra ?? "");
+  }
+
+  function prepareEdit(residential: string, apartment: string) {
+    const selectableResidentialNumbers = [...new Set(apartments.map((item) => item.residential_number))]
+      .sort((first, second) => first - second)
+      .slice(-3);
+    const selectedResidential = selectableResidentialNumbers.includes(Number(residential))
+      ? residential
+      : String(selectableResidentialNumbers[selectableResidentialNumbers.length - 1] ?? "");
+    const residentialApartments = apartments
+      .filter((item) => item.residential_number === Number(selectedResidential))
+      .sort((first, second) => first.apartment_number - second.apartment_number);
+    const selectedApartment = residentialApartments.some((item) => item.apartment_number === Number(apartment))
+      ? apartment
+      : String(residentialApartments[0]?.apartment_number ?? "");
+    setEditResidential(selectedResidential);
+    setEditApartment(selectedApartment);
+    const record = residentialApartments.find((item) => item.apartment_number === Number(selectedApartment));
+    populateEdit(record);
   }
 
   async function handleLogin(event: FormEvent<HTMLFormElement>) {
@@ -285,10 +375,14 @@ function App() {
       setToast("Apartamento não encontrado. Confira a configuração inicial do Supabase.");
       return;
     }
-    const price = Number(editPrice.replace(",", "."));
+    const priceInput = editPrice.trim();
+    const price = priceInput ? Number(priceInput.replace(",", ".")) : null;
     const area = editArea ? Number(editArea.replace(",", ".")) : null;
-    if (!Number.isFinite(price) || price < 0 || (area !== null && (!Number.isFinite(area) || area <= 0))) {
-      setToast("Confira o valor e a área informados.");
+    const bedrooms = editBedrooms.trim() ? Number(editBedrooms) : null;
+    if ((price !== null && (!Number.isFinite(price) || price <= 0))
+      || (area !== null && (!Number.isFinite(area) || area <= 0))
+      || (bedrooms !== null && (!Number.isInteger(bedrooms) || bedrooms < 0 || bedrooms > 20))) {
+      setToast("Confira o valor, a área e a quantidade de quartos informados.");
       return;
     }
     setBusy(true);
@@ -298,8 +392,12 @@ function App() {
         status: editStatus,
         price,
         area,
-        bedrooms: Number(editBedrooms),
+        bedrooms,
         description: editDescription.trim(),
+        technical_attributes: editTechnicalAttributes,
+        technical_extra: editTechnicalExtra.trim(),
+        financial_attributes: editFinancialAttributes,
+        financial_extra: editFinancialExtra.trim(),
       })
       .eq("id", record.id);
     setBusy(false);
@@ -310,6 +408,81 @@ function App() {
     setToast("Informações do apartamento atualizadas.");
     setAdminOpen(false);
     await fetchApartments();
+  }
+
+  async function handleDeleteApartment() {
+    if (!supabase || !isAdmin) return;
+    const record = apartments.find((item) => item.residential_number === Number(editResidential) && item.apartment_number === Number(editApartment));
+    if (!record) return;
+    const apartmentName = `Apartamento ${unitDisplayNumber(apartments, record)}`;
+    const residentialName = residentialDisplayName(apartments, record.residential_number);
+    if (!window.confirm(`Excluir ${apartmentName} de ${residentialName}?\n\nEsta ação é permanente e não pode ser desfeita.`)) return;
+
+    setBusy(true);
+    const { data, error } = await supabase
+      .from("apartments")
+      .delete()
+      .eq("id", record.id)
+      .select("id");
+    setBusy(false);
+    if (error) {
+      setToast(`Não foi possível excluir o apartamento: ${error.message}`);
+      return;
+    }
+    if (!data?.length) {
+      setToast("O apartamento não foi excluído. Confira se a migração de exclusão foi executada e tente novamente.");
+      return;
+    }
+
+    const remainingApartments = await fetchApartments();
+    const nextRecord = remainingApartments?.find((item) => item.residential_number === record.residential_number)
+      ?? remainingApartments?.[remainingApartments.length - 1];
+    if (nextRecord) {
+      setEditResidential(String(nextRecord.residential_number));
+      setEditApartment(String(nextRecord.apartment_number));
+      populateEdit(nextRecord);
+    } else {
+      setAdminOpen(false);
+    }
+    setToast(`${apartmentName} excluído.`);
+  }
+
+  async function handleDeleteResidential() {
+    if (!supabase || !isAdmin) return;
+    const residentialNumber = Number(editResidential);
+    const residentialApartments = apartments.filter((item) => item.residential_number === residentialNumber);
+    if (!residentialApartments.length) return;
+    const residentialName = residentialDisplayName(apartments, residentialNumber);
+    const apartmentCount = residentialApartments.length;
+    if (!window.confirm(`Excluir ${residentialName} e suas ${apartmentCount} unidades?\n\nEsta ação é permanente e não pode ser desfeita.`)) return;
+
+    setBusy(true);
+    const { data, error } = await supabase
+      .from("apartments")
+      .delete()
+      .eq("residential_number", residentialNumber)
+      .select("id");
+    setBusy(false);
+    if (error) {
+      setToast(`Não foi possível excluir o residencial: ${error.message}`);
+      return;
+    }
+    if (data?.length !== apartmentCount) {
+      setToast("Nem todas as unidades foram excluídas. Atualize os dados e confira se a migração de exclusão foi executada.");
+      await fetchApartments();
+      return;
+    }
+
+    const remainingApartments = await fetchApartments();
+    const nextRecord = remainingApartments?.[remainingApartments.length - 1];
+    if (nextRecord) {
+      setEditResidential(String(nextRecord.residential_number));
+      setEditApartment(String(nextRecord.apartment_number));
+      populateEdit(nextRecord);
+    } else {
+      setAdminOpen(false);
+    }
+    setToast(`${residentialName} e suas ${apartmentCount} unidades foram excluídos.`);
   }
 
   async function handleCreateResidential(event: FormEvent<HTMLFormElement>) {
@@ -323,14 +496,33 @@ function App() {
     }
 
     const apartmentCount = counts.reduce((total, count) => total + count, 0);
-    const residentialNumber = (residentialNumbers[residentialNumbers.length - 1] ?? 0) + 1;
-    if (residentialNumber > 32767 || apartmentCount > 32767) {
+    if (apartmentCount > 32767) {
       setToast("A quantidade informada ultrapassa o limite permitido.");
       return;
     }
 
+    setBusy(true);
+    const { data: latestResidential, error: lookupError } = await supabase
+      .from("apartments")
+      .select("residential_number")
+      .order("residential_number", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (lookupError) {
+      setBusy(false);
+      setToast(`Não foi possível verificar os residenciais existentes: ${lookupError.message}`);
+      return;
+    }
+
+    const residentialNumber = (latestResidential?.residential_number ?? 0) + 1;
+    if (residentialNumber > 32767) {
+      setBusy(false);
+      setToast("A quantidade informada ultrapassa o limite permitido.");
+      return;
+    }
     const residentialName = newResidentialName.trim();
     if (!residentialName) {
+      setBusy(false);
       setToast("Informe o nome do residencial.");
       return;
     }
@@ -340,6 +532,7 @@ function App() {
       (apartment) => normalizeResidentialName(residentialDisplayName(apartments, apartment.residential_number)) === normalizedResidentialName,
     );
     if (duplicateResidential) {
+      setBusy(false);
       setToast(`Já existe um residencial chamado "${residentialDisplayName(apartments, duplicateResidential.residential_number)}". Informe outro nome.`);
       return;
     }
@@ -355,7 +548,6 @@ function App() {
       })),
     );
 
-    setBusy(true);
     const { error } = await supabase.from("apartments").insert(newApartments);
     setBusy(false);
     if (error) {
@@ -378,6 +570,14 @@ function App() {
   const selectedResidentialApartments = apartments
     .filter((item) => item.residential_number === Number(editResidential))
     .sort((first, second) => first.apartment_number - second.apartment_number);
+  const updateAttribute = (
+    attributes: ApartmentAttribute[],
+    setAttributes: (attributes: ApartmentAttribute[]) => void,
+    index: number,
+    field: keyof ApartmentAttribute,
+    value: string,
+  ) => setAttributes(attributes.map((attribute, attributeIndex) =>
+    attributeIndex === index ? { ...attribute, [field]: value } : attribute));
 
   return (
     <div className="site-shell">
@@ -414,12 +614,42 @@ function App() {
           <div className="hero-image" aria-hidden="true" />
           <div className="hero-content">
             <div className="eyebrow"><span /> UM LUGAR PARA CHAMAR DE SEU</div>
-            <h1>Seu próximo capítulo<br />começa <em>aqui.</em></h1>
+            <h1>Seu próximo<br />capítulo começa <em>aqui.</em></h1>
             <p>Conforto, tranquilidade e um cantinho só seu.<br className="desktop-break" /> Conheça os apartamentos Plenitude.</p>
             <a className="hero-cta" href="#imoveis">Encontre seu apartamento <ArrowDown size={16} /></a>
           </div>
-          <div className="hero-note"><span className="note-line" /> Há um Plenitude perfeito para você.</div>
-          <div className="hero-index"><strong>+10</strong><span>residenciais<br />construídos</span></div>
+          <div
+            className="hero-gallery"
+            aria-label="Galeria de fotos dos residenciais"
+            onMouseEnter={() => setHomeGalleryHovered(true)}
+            onMouseLeave={() => setHomeGalleryHovered(false)}
+            onFocusCapture={() => setHomeGalleryFocused(true)}
+            onBlurCapture={(event) => {
+              if (!(event.relatedTarget instanceof Node) || !event.currentTarget.contains(event.relatedTarget)) {
+                setHomeGalleryFocused(false);
+              }
+            }}
+          >
+            <div className="hero-gallery-frame">
+              <img className="hero-gallery-photo" src={activeHomeGallerySlide.image} alt={activeHomeGallerySlide.title} />
+              <div className="hero-gallery-caption">
+                <span className="hero-gallery-title">{activeHomeGallerySlide.title}</span>
+                <span className="hero-gallery-count">{String(homeGalleryIndex + 1).padStart(2, "0")} / {String(homeGallerySlides.length).padStart(2, "0")}</span>
+              </div>
+            </div>
+            <div className="hero-gallery-controls">
+              <span>Galeria de inspiração</span>
+              <div>
+                <button type="button" aria-label="Foto anterior" onClick={() => setHomeGalleryIndex((index) => (index - 1 + homeGallerySlides.length) % homeGallerySlides.length)}><ChevronLeft size={17} /></button>
+                <button type="button" aria-label="Próxima foto" onClick={() => setHomeGalleryIndex((index) => (index + 1) % homeGallerySlides.length)}><ChevronRight size={17} /></button>
+              </div>
+            </div>
+            <p className="hero-gallery-disclaimer">Fotos ilustrativas. Exemplo de decoração para apartamento de 48 m².</p>
+          </div>
+          <div className="hero-footer">
+            <div className="hero-note"><span className="note-line" /> Há um Plenitude perfeito para você.</div>
+            <div className="hero-index"><strong>+10</strong><span>residenciais<br />construídos</span></div>
+          </div>
         </section>
 
         <section className="intro-section" id="sobre">
@@ -488,8 +718,12 @@ function App() {
             : visibleApartments.length === 0
               ? <div className="empty-state"><House size={28} /><h3>{apartments.length === 0 ? "A disponibilidade aparecerá aqui" : "Nenhum apartamento encontrado"}</h3><p>{apartments.length === 0 ? "Assim que o Supabase estiver conectado, os imóveis serão exibidos nesta página." : "Tente mudar os filtros para ver outros apartamentos."}</p></div>
               : <div className="apartment-grid">
-                {visibleApartments.map((apartment) => (
-                  <article className="apartment-card" key={apartment.id}>
+                {visibleApartments.map((apartment) => {
+                  const technicalAttributes = (apartment.technical_attributes ?? [])
+                    .filter((attribute) => attribute.label.trim() && attribute.value.trim());
+                  const financialAttributes = (apartment.financial_attributes ?? [])
+                    .filter((attribute) => attribute.label.trim() && attribute.value.trim());
+                  return <article className="apartment-card" key={apartment.id}>
                     <div className={`card-visual visual-${(apartment.residential_number + apartment.apartment_number) % 4}`}>
                       <div className="visual-sun" />
                       <div className="building-illustration">
@@ -508,19 +742,37 @@ function App() {
                       <h3>Apartamento {unitDisplayNumber(apartments, apartment)}</h3>
                       <div className="apartment-details">
                         <span><DoorOpen size={15} /> {apartment.floor}</span>
-                        {apartment.bedrooms > 0 && <span><BedDouble size={15} /> {apartment.bedrooms} quartos</span>}
+                        {apartment.bedrooms != null && <span><BedDouble size={15} /> {apartment.bedrooms} quartos</span>}
                         {apartment.area && <span><MapPin size={14} /> {apartment.area} m²</span>}
                       </div>
                       {apartment.description && <p className="card-description">{apartment.description}</p>}
+                      {(technicalAttributes.length > 0 || apartment.technical_extra.trim()) && (
+                        <div className="card-attribute-group">
+                          <strong>Características</strong>
+                          {technicalAttributes.map((attribute, index) => (
+                            <p key={`${attribute.label}-${index}`}><span>{attribute.label}</span>{attribute.value}</p>
+                          ))}
+                          {apartment.technical_extra.trim() && <p>{apartment.technical_extra}</p>}
+                        </div>
+                      )}
+                      {(financialAttributes.length > 0 || apartment.financial_extra.trim()) && (
+                        <div className="card-attribute-group">
+                          <strong>Informações de venda</strong>
+                          {financialAttributes.map((attribute, index) => (
+                            <p key={`${attribute.label}-${index}`}><span>{attribute.label}</span>{attribute.value}</p>
+                          ))}
+                          {apartment.financial_extra.trim() && <p>{apartment.financial_extra}</p>}
+                        </div>
+                      )}
                       <div className="card-footer">
-                        <div><small>VALOR</small><strong>{apartment.price ? currency(apartment.price) : "Consulte"}</strong></div>
+                        <div><small>VALOR</small><strong>{apartment.price && apartment.price > 0 ? currency(apartment.price) : "A consultar"}</strong></div>
                         {apartment.status === "disponivel"
                           ? <a href={`https://wa.me/${consultantWhatsappNumber}?text=${encodeURIComponent(`Olá! Vim do site e tenho interesse no Apartamento ${unitDisplayNumber(apartments, apartment)} do ${residentialDisplayName(apartments, apartment.residential_number)}.`)}`} target="_blank" rel="noreferrer" className="card-action" aria-label="Consultar apartamento"><ArrowRight size={18} /></a>
                           : <span className="card-status-note">{statuses[apartment.status].label}</span>}
                       </div>
                     </div>
-                  </article>
-                ))}
+                  </article>;
+                })}
               </div>}
           {visibleApartments.length > 0 && (
             <div className="catalog-footer"><span>Exibindo {visibleApartments.length} de {apartments.length} apartamentos</span><span><Check size={14} /> Disponibilidade atualizada pela equipe</span></div>
@@ -541,7 +793,7 @@ function App() {
           <span>CNPJ: 30.606.951/0001-70</span>
           <span>© {new Date().getFullYear()} Residenciais Plenitude</span>
         </div>
-        <span className="footer-developer">Desenvolvido por Jobson Medeiros · <a href={`https://wa.me/${developerWhatsappNumber}`} target="_blank" rel="noreferrer">@jmmjp</a></span>
+        <span className="footer-developer">Desenvolvido por Jobson Medeiros · <a href={`https://wa.me/${developerWhatsappNumber}?text=${encodeURIComponent("Olá! Vim pelo site Residenciais Plenitude e gostaria de entrar em contato.")}`} target="_blank" rel="noreferrer">@jmmjp</a></span>
       </footer>
 
       {loginOpen && (
@@ -575,7 +827,7 @@ function App() {
             </div>
             {creatingResidential ? (
               <>
-                <p>Informe o nome do residencial e quantos apartamentos serão criados em cada andar.</p>
+                <p>Defina o nome do residencial e informe quantos apartamentos serão criados em cada andar.</p>
                 <form onSubmit={handleCreateResidential}>
                   <label>Nome do residencial
                     <input type="text" maxLength={100} value={newResidentialName} onChange={(event) => setNewResidentialName(event.target.value)} placeholder="Informe o nome do residencial" required />
@@ -601,6 +853,22 @@ function App() {
             ) : (
               <>
                 <p>Escolha o residencial e o apartamento para editar as informações.</p>
+                {loadError && (
+                  <div className="setup-notice error-notice admin-load-error" role="alert">
+                    <ShieldCheck size={18} />
+                    <span>{loadError} Se o erro mencionar coluna inexistente, execute as migrações SQL pendentes em <code>supabase/</code> e tente novamente.
+                      <button type="button" onClick={() => void fetchApartments()} disabled={loading}>
+                        {loading ? "Carregando..." : "Tentar carregar novamente"}
+                      </button>
+                    </span>
+                  </div>
+                )}
+                {!loadError && !loading && apartments.length === 0 && (
+                  <div className="setup-notice admin-load-error">
+                    <ShieldCheck size={18} />
+                    <span>Nenhum apartamento foi encontrado no banco. Crie um residencial ou confira se os dados estão no projeto Supabase configurado.</span>
+                  </div>
+                )}
                 <form onSubmit={handleSave}>
                   <div className="form-row">
                     <label>Residencial
@@ -622,7 +890,7 @@ function App() {
                       </select>
                     </label>
                     <label>Valor do imóvel (R$)
-                      <input type="number" step="1000" inputMode="decimal" value={editPrice} onChange={(event) => setEditPrice(event.target.value)} placeholder="Ex.: 189000" required />
+                      <input type="number" min="0.01" step="0.01" inputMode="decimal" value={editPrice} onChange={(event) => setEditPrice(event.target.value)} placeholder="Deixe vazio para exibir A consultar" />
                     </label>
                   </div>
                   <div className="form-row">
@@ -630,12 +898,52 @@ function App() {
                       <input type="number" min="0" step="1" inputMode="decimal" value={editArea} onChange={(event) => setEditArea(event.target.value)} placeholder="Ex.: 52" />
                     </label>
                     <label>Quartos
-                      <input type="number" min="0" max="20" step="1" value={editBedrooms} onChange={(event) => setEditBedrooms(event.target.value)} required />
+                      <input type="number" min="0" max="20" step="1" value={editBedrooms} onChange={(event) => setEditBedrooms(event.target.value)} placeholder="Não informado" />
                     </label>
                   </div>
                   <label className="description-label">Informações do apartamento
                     <textarea rows={3} maxLength={500} value={editDescription} onChange={(event) => setEditDescription(event.target.value)} placeholder="Descreva os diferenciais deste apartamento..." />
                   </label>
+                  <section className="attribute-editor">
+                    <h3>Ficha técnica</h3>
+                    <div className="attribute-list">
+                      {editTechnicalAttributes.map((attribute, index) => (
+                        <div className="attribute-row" key={`technical-${index}`}>
+                          <input aria-label="Nome do atributo técnico" value={attribute.label} onChange={(event) => updateAttribute(editTechnicalAttributes, setEditTechnicalAttributes, index, "label", event.target.value)} placeholder="Atributo (ex.: Posição solar)" />
+                          <input aria-label="Valor do atributo técnico" value={attribute.value} onChange={(event) => updateAttribute(editTechnicalAttributes, setEditTechnicalAttributes, index, "value", event.target.value)} placeholder="Informação" />
+                          <button type="button" className="remove-attribute-button" onClick={() => setEditTechnicalAttributes((current) => current.filter((_, itemIndex) => itemIndex !== index))} aria-label="Remover atributo técnico"><X size={15} /></button>
+                        </div>
+                      ))}
+                    </div>
+                    <button type="button" className="secondary-button add-attribute-button" onClick={() => setEditTechnicalAttributes((current) => [...current, { label: "", value: "" }])}><Plus size={15} /> Adicionar atributo</button>
+                    <label className="description-label">Informação técnica extra
+                      <textarea rows={2} maxLength={1000} value={editTechnicalExtra} onChange={(event) => setEditTechnicalExtra(event.target.value)} placeholder="Informações adicionais sobre o imóvel..." />
+                    </label>
+                  </section>
+                  <section className="attribute-editor">
+                    <h3>Informações financeiras e de venda</h3>
+                    <div className="attribute-list">
+                      {editFinancialAttributes.map((attribute, index) => (
+                        <div className="attribute-row" key={`financial-${index}`}>
+                          <input aria-label="Nome do atributo financeiro" value={attribute.label} onChange={(event) => updateAttribute(editFinancialAttributes, setEditFinancialAttributes, index, "label", event.target.value)} placeholder="Atributo (ex.: Condomínio mensal)" />
+                          <input aria-label="Valor do atributo financeiro" value={attribute.value} onChange={(event) => updateAttribute(editFinancialAttributes, setEditFinancialAttributes, index, "value", event.target.value)} placeholder="Informação" />
+                          <button type="button" className="remove-attribute-button" onClick={() => setEditFinancialAttributes((current) => current.filter((_, itemIndex) => itemIndex !== index))} aria-label="Remover atributo financeiro"><X size={15} /></button>
+                        </div>
+                      ))}
+                    </div>
+                    <button type="button" className="secondary-button add-attribute-button" onClick={() => setEditFinancialAttributes((current) => [...current, { label: "", value: "" }])}><Plus size={15} /> Adicionar atributo</button>
+                    <label className="description-label">Informação financeira extra
+                      <textarea rows={2} maxLength={1000} value={editFinancialExtra} onChange={(event) => setEditFinancialExtra(event.target.value)} placeholder="Condições de pagamento, propostas ou outras informações..." />
+                    </label>
+                  </section>
+                  <section className="delete-actions" aria-label="Ações de exclusão">
+                    <h3>Excluir dados</h3>
+                    <p>As exclusões são permanentes e exigem confirmação.</p>
+                    <div>
+                      <button type="button" className="danger-button" onClick={() => void handleDeleteApartment()} disabled={busy || !selectedRecord}>Excluir apartamento</button>
+                      <button type="button" className="danger-button" onClick={() => void handleDeleteResidential()} disabled={busy || !selectedResidentialApartments.length}>Excluir residencial e unidades</button>
+                    </div>
+                  </section>
                   <div className="dialog-actions">
                     <button type="button" className="secondary-button" onClick={handleLogout}><LogIn size={15} className="logout-icon" /> Sair</button>
                     <button className="primary-button save-button" disabled={busy || !selectedRecord}>{busy ? "Salvando..." : <><CircleCheck size={16} /> Salvar alterações</>}</button>

@@ -10,10 +10,14 @@ create table if not exists public.apartments (
   apartment_number smallint not null check (apartment_number between 1 and 32767),
   floor text not null check (length(trim(floor)) > 0),
   status text not null default 'confirmar' check (status in ('confirmar', 'disponivel', 'negociacao', 'vendido')),
-  price numeric(12, 2) not null default 0 check (price >= 0),
+  price numeric(12, 2) check (price > 0),
   area numeric(8, 2),
-  bedrooms smallint not null default 2 check (bedrooms between 0 and 20),
+  bedrooms smallint check (bedrooms between 0 and 20),
   description text not null default '',
+  technical_attributes jsonb not null default '[]'::jsonb,
+  technical_extra text not null default '',
+  financial_attributes jsonb not null default '[]'::jsonb,
+  financial_extra text not null default '',
   updated_at timestamptz not null default now(),
   unique (residential_number, apartment_number)
 );
@@ -113,7 +117,6 @@ create trigger apartments_prevent_duplicate_residential_name
 before insert or update of residential_number, residential_name on public.apartments
 for each row execute function public.prevent_duplicate_residential_name();
 
-
 alter table public.apartments drop constraint if exists apartments_residential_number_check;
 alter table public.apartments drop constraint if exists apartments_apartment_number_check;
 alter table public.apartments drop constraint if exists apartments_floor_check;
@@ -177,6 +180,18 @@ with check (
   )
 );
 
+drop policy if exists "Admins can delete apartments" on public.apartments;
+create policy "Admins can delete apartments"
+on public.apartments for delete
+to authenticated
+using (
+  exists (
+    select 1 from public.profiles
+    where profiles.user_id = (select auth.uid())
+      and profiles.role = 'admin'
+  )
+);
+
 drop policy if exists "Users can view their own profile" on public.profiles;
 create policy "Users can view their own profile"
 on public.profiles for select
@@ -185,7 +200,9 @@ using (user_id = (select auth.uid()));
 
 grant select on public.apartments to anon, authenticated;
 grant insert (residential_number, residential_name, apartment_number, floor) on public.apartments to authenticated;
-grant update (status, price, area, bedrooms, description) on public.apartments to authenticated;
+grant update (status, price, area, bedrooms, description, technical_attributes, technical_extra, financial_attributes, financial_extra)
+on public.apartments to authenticated;
+grant delete on public.apartments to authenticated;
 grant select on public.profiles to authenticated;
 
 -- After creating the user in Supabase Authentication, grant them administrator access:
