@@ -41,7 +41,12 @@ button { cursor: pointer; }
 .hero-content { position: relative; z-index: 2; width: auto; min-width: 0; max-width: 500px; margin: 0; }
 .hero-gallery { position: relative; z-index: 1; width: 100%; min-width: 0; max-width: 500px; margin: 0; }
 .hero-gallery-frame { position: relative; aspect-ratio: 1.5; overflow: hidden; border: 1px solid rgba(255,255,255,.32); border-radius: 4px; background-color: #c9c6b7; box-shadow: 0 18px 40px rgba(8,21,15,.18); }
-.hero-gallery-photo { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.hero-gallery-photo { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; animation-duration: .55s; animation-timing-function: cubic-bezier(.22,.68,0,1); }
+.hero-gallery-photo-next { animation-name: gallery-slide-from-right; }
+.hero-gallery-photo-previous { animation-name: gallery-slide-from-left; }
+@keyframes gallery-slide-from-right { from { transform: translateX(100%); } to { transform: translateX(0); } }
+@keyframes gallery-slide-from-left { from { transform: translateX(-100%); } to { transform: translateX(0); } }
+@media (prefers-reduced-motion: reduce) { .hero-gallery-photo { animation: none; } }
 .hero-gallery-caption { position: absolute; z-index: 2; right: 0; bottom: 0; left: 0; min-height: 34px; padding: 8px 12px; display: flex; justify-content: space-between; align-items: center; gap: 12px; color: white; background: rgba(23,45,38,.76); }
 .hero-gallery-title { color: white; font: 600 13px "Manrope",sans-serif; }
 .hero-gallery-count { flex: 0 0 auto; color: white; font-size: 10px; letter-spacing: 1.5px; }

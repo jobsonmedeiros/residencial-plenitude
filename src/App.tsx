@@ -220,15 +220,23 @@ function App() {
     : String(filterResidentialNumbers[0] ?? "");
   const recentResidentials = residentialNumbers.slice(-3).map((number) => ({ number, roman: romanNumeral(number) }));
   const activeHomeGallerySlide = homeGallerySlides[homeGalleryIndex];
+  const [homeGalleryDirection, setHomeGalleryDirection] = useState<"next" | "previous">("next");
+
+  const changeHomeGallerySlide = useCallback((direction: "next" | "previous") => {
+    setHomeGalleryDirection(direction);
+    setHomeGalleryIndex((index) =>
+      (index + (direction === "next" ? 1 : -1) + homeGallerySlides.length) % homeGallerySlides.length,
+    );
+  }, []);
 
   useEffect(() => {
     if (homeGalleryHovered || homeGalleryFocused || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
     const timer = window.setInterval(
-      () => setHomeGalleryIndex((index) => (index + 1) % homeGallerySlides.length),
+      () => changeHomeGallerySlide("next"),
       3000,
     );
     return () => window.clearInterval(timer);
-  }, [homeGalleryFocused, homeGalleryHovered]);
+  }, [changeHomeGallerySlide, homeGalleryFocused, homeGalleryHovered]);
 
   useEffect(() => {
     void fetchApartments();
@@ -631,7 +639,12 @@ function App() {
             }}
           >
             <div className="hero-gallery-frame">
-              <img className="hero-gallery-photo" src={activeHomeGallerySlide.image} alt={activeHomeGallerySlide.title} />
+              <img
+                key={homeGalleryIndex}
+                className={`hero-gallery-photo hero-gallery-photo-${homeGalleryDirection}`}
+                src={activeHomeGallerySlide.image}
+                alt={activeHomeGallerySlide.title}
+              />
               <div className="hero-gallery-caption">
                 <span className="hero-gallery-title">{activeHomeGallerySlide.title}</span>
                 <span className="hero-gallery-count">{String(homeGalleryIndex + 1).padStart(2, "0")} / {String(homeGallerySlides.length).padStart(2, "0")}</span>
@@ -640,8 +653,8 @@ function App() {
             <div className="hero-gallery-controls">
               <span>Galeria de inspiração</span>
               <div>
-                <button type="button" aria-label="Foto anterior" onClick={() => setHomeGalleryIndex((index) => (index - 1 + homeGallerySlides.length) % homeGallerySlides.length)}><ChevronLeft size={17} /></button>
-                <button type="button" aria-label="Próxima foto" onClick={() => setHomeGalleryIndex((index) => (index + 1) % homeGallerySlides.length)}><ChevronRight size={17} /></button>
+                <button type="button" aria-label="Foto anterior" onClick={() => changeHomeGallerySlide("previous")}><ChevronLeft size={17} /></button>
+                <button type="button" aria-label="Próxima foto" onClick={() => changeHomeGallerySlide("next")}><ChevronRight size={17} /></button>
               </div>
             </div>
             <p className="hero-gallery-disclaimer">Fotos ilustrativas. Exemplo de decoração para apartamento de 48 m².</p>
